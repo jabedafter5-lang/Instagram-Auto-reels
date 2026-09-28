@@ -47,7 +47,8 @@ def post_instagram_reel():
         'media_type': 'REELS',
         'video_url': VIDEO_URL,
         'caption': CAPTION,
-        'access_token': ACCESS_TOKEN
+        'access_token': ACCESS_TOKEN,
+        'hide_like_and_view_counts': 'true'
     }
     
     response = requests.post(url, data=payload)
