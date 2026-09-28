@@ -2,7 +2,8 @@ name: Auto Post Instagram Reels
 
 on:
   schedule:
-    - cron: '0 3,12 * * *'
+    - cron: '30 6,11 * * *'
+    
   workflow_dispatch:
 
 jobs:
