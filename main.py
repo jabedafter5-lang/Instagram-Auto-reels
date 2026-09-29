@@ -7,6 +7,7 @@ ACCESS_TOKEN = os.getenv("IG_ACCESS_TOKEN")
 USER_ID = os.getenv("IG_USER_ID")
 
 REELS_FOLDER = "reels"
+LOG_FILE = "posted_videos.txt"
 
 CAPTION = """Follow
 
@@ -16,30 +17,43 @@ Reactions in replies mix awe at the monkey's trust and survival-described as "br
 
 The stunt highlights primate curiosity toward novel objects but raises ethical concerns about unintended animal risks in fireworks settings, with no peer-reviewed studies on such events but general research noting capuchins' adaptability in human environments."""
 
+def get_posted_videos():
+    if not os.path.exists(LOG_FILE):
+        return set()
+    with open(LOG_FILE, "r") as f:
+        return set(line.strip() for line in f.readlines())
+
+def mark_as_posted(video_file):
+    with open(LOG_FILE, "a") as f:
+        f.write(video_file + "\n")
+
 def get_next_reel():
     if not os.path.exists(REELS_FOLDER):
         os.makedirs(REELS_FOLDER)
         return None
     
-    # Sabse pehle latest files lane ke liye git pull chala do taaki koi mismatch na ho
     os.system('git pull origin main --rebase || echo "Already up to date"')
     
     files = sorted(os.listdir(REELS_FOLDER))
     video_files = [f for f in files if f.endswith(('.mp4', '.mov', '.MP4'))]
     
-    if not video_files:
-        return None
+    posted_videos = get_posted_videos()
     
-    return video_files[0]
+    # Jo video pehle post ho chuki hai, usko chhod kar agli nayi video dhundo
+    for video in video_files:
+        if video not in posted_videos:
+            return video
+            
+    return None
 
 def post_instagram_reel():
     video_file = get_next_reel()
     if not video_file:
-        print("Koi video nahi mili reels folder mein!")
+        print("Koi nayi video nahi mili reels folder mein sab post ho chuki hain!")
         return
 
     video_path = os.path.join(REELS_FOLDER, video_file)
-    print(f"Posting video: {video_file}")
+    print(f"Posting new video: {video_file}")
 
     REPO_NAME = os.getenv("GITHUB_REPOSITORY")
     BRANCH = "main"
@@ -80,16 +94,17 @@ def post_instagram_reel():
     print("Publish Result:", pub_result)
 
     if 'id' in pub_result:
-        print("Posted successfully. Removing file from repository...")
+        print("Posted successfully. Marking as posted in log file...")
+        mark_as_posted(video_file)
         
-        # Git config aur permanent deletion commands
+        # Log file ko GitHub par push kar do taaki record save rahe
         os.system('git config --global user.name "GitHub Action Bot"')
         os.system('git config --global user.email "action@github.com"')
         os.system('git pull origin main --rebase || echo "No need to pull"')
-        os.system(f'git rm "{video_path}"')
-        os.system(f'git commit -m "Remove posted reel: {video_file}"')
+        os.system(f'git add {LOG_FILE}')
+        os.system(f'git commit -m "Mark {video_file} as posted"')
         os.system('git push origin main')
-        print("File deleted from repository successfully!")
+        print("Log updated and pushed successfully!")
 
 if __name__ == "__main__":
     post_instagram_reel()
