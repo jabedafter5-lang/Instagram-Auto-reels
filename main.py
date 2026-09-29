@@ -42,7 +42,7 @@ def post_instagram_reel():
     VIDEO_URL = f"https://raw.githubusercontent.com/{REPO_NAME}/{BRANCH}/{video_path}"
 
     print("Step 1: Container create ho raha hai...")
-    url = f"https://graph.facebook.com/v20.0/{USER_ID}/media"
+    url = f"https://graph.instagram.com/v20.0/{USER_ID}/media"
     payload = {
         'media_type': 'REELS',
         'video_url': VIDEO_URL,
@@ -63,7 +63,7 @@ def post_instagram_reel():
     time.sleep(40)
     
     print("Step 2: Reel publish ki ja rahi hai...")
-    publish_url = f"https://graph.facebook.com/v20.0/{USER_ID}/media_publish"
+    publish_url = f"https://graph.instagram.com/v20.0/{USER_ID}/media_publish"
     publish_payload = {
         'creation_id': creation_id,
         'access_token': ACCESS_TOKEN
