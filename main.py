@@ -64,7 +64,7 @@ def post_instagram_reel():
     
     creation_id = result['id']
     print(f"Container ID mil gayi: {creation_id}. High quality processing ka wait ho raha hai...")
-    time.sleep(40)
+    time.sleep(90)
     
     print("Step 2: Reel publish ki ja rahi hai...")
     publish_url = f"https://graph.instagram.com/v20.0/{USER_ID}/media_publish"
