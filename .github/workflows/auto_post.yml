@@ -9,6 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Yeh zaroori hai taaki script GitHub ke andar file save kar sake
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -26,3 +29,12 @@ jobs:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
         run: python main.py
+
+      - name: Auto Keep-Alive Commit
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "action@github.com"
+          python keep_alive.py
+          git add keep_alive_log.txt
+          git commit -m "Auto-update keep alive log to prevent inactivity pause" || echo "No changes to commit"
+          git push
