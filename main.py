@@ -1,6 +1,7 @@
 import os
 import time
 import requests
+import urllib.parse
 
 ACCESS_TOKEN = os.getenv("IG_ACCESS_TOKEN")
 USER_ID = os.getenv("IG_USER_ID")
@@ -39,7 +40,10 @@ def post_instagram_reel():
 
     REPO_NAME = os.getenv("GITHUB_REPOSITORY")
     BRANCH = "main"
-    VIDEO_URL = f"https://raw.githubusercontent.com/{REPO_NAME}/{BRANCH}/{video_path}"
+    
+    # URL encoding taaki spaces aur # automatic fix ho jayein
+    encoded_video_path = urllib.parse.quote(video_path)
+    VIDEO_URL = f"https://raw.githubusercontent.com/{REPO_NAME}/{BRANCH}/{encoded_video_path}"
 
     print("Step 1: Container create ho raha hai...")
     url = f"https://graph.instagram.com/v20.0/{USER_ID}/media"
