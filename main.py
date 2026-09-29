@@ -21,6 +21,9 @@ def get_next_reel():
         os.makedirs(REELS_FOLDER)
         return None
     
+    # Sabse pehle latest files lane ke liye git pull chala do taaki koi mismatch na ho
+    os.system('git pull origin main --rebase || echo "Already up to date"')
+    
     files = sorted(os.listdir(REELS_FOLDER))
     video_files = [f for f in files if f.endswith(('.mp4', '.mov', '.MP4'))]
     
@@ -41,7 +44,6 @@ def post_instagram_reel():
     REPO_NAME = os.getenv("GITHUB_REPOSITORY")
     BRANCH = "main"
     
-    # URL encoding taaki spaces aur # automatic fix ho jayein
     encoded_video_path = urllib.parse.quote(video_path)
     VIDEO_URL = f"https://raw.githubusercontent.com/{REPO_NAME}/{BRANCH}/{encoded_video_path}"
 
@@ -78,8 +80,16 @@ def post_instagram_reel():
     print("Publish Result:", pub_result)
 
     if 'id' in pub_result:
-        os.remove(video_path)
-        print("Posted file deleted successfully")
+        print("Posted successfully. Removing file from repository...")
+        
+        # Git config aur permanent deletion commands
+        os.system('git config --global user.name "GitHub Action Bot"')
+        os.system('git config --global user.email "action@github.com"')
+        os.system('git pull origin main --rebase || echo "No need to pull"')
+        os.system(f'git rm "{video_path}"')
+        os.system(f'git commit -m "Remove posted reel: {video_file}"')
+        os.system('git push origin main')
+        print("File deleted from repository successfully!")
 
 if __name__ == "__main__":
     post_instagram_reel()
