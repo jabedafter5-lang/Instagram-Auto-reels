@@ -34,7 +34,8 @@ jobs:
         run: |
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "action@github.com"
+          git pull origin main --rebase || echo "No need to pull"
           python keep_alive.py
           git add keep_alive_log.txt
           git commit -m "Auto-update keep alive log to prevent inactivity pause" || echo "No changes to commit"
-          git push
+          git push origin main
