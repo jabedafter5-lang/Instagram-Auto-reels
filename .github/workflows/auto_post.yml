@@ -1,16 +1,13 @@
 name: Auto Post Instagram Reels
 
 on:
-  schedule:
-    - cron: '50 14 * * *'
-    
-  workflow_dispatch:
+  workflow_dispatch:  # Ab yeh sirf external request ya manual click par chalega
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Yeh zaroori hai taaki script GitHub ke andar file save kar sake
+      contents: write  
     
     steps:
       - name: Checkout code
