@@ -1,7 +1,9 @@
 name: Auto Post Instagram Reels
 
 on:
-  workflow_dispatch:  # Ab yeh sirf external request ya manual click par chalega
+  workflow_dispatch:
+  repository_dispatch:
+    types: [auto_post]
 
 jobs:
   build:
