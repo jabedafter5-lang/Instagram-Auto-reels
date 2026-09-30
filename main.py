@@ -1,6 +1,7 @@
 import os
 import re
 import time
+from datetime import datetime
 import requests
 import urllib.parse
 import subprocess
@@ -14,6 +15,7 @@ ACCESS_TOKEN_2 = os.getenv("IG_ACCESS_TOKEN_2")
 USER_ID_2 = os.getenv("IG_USER_ID_2")
 
 REELS_FOLDER = "reels"
+LOG_FILE = "posted_videos.txt"
 
 BASE_CAPTION = """Follow
 
@@ -67,6 +69,22 @@ def build_caption_from_filename(video_file):
         final_caption = BASE_CAPTION
         
     return final_caption
+
+def log_posted_text(video_file):
+    # Sirf plain text (Name + Tags + Date) log file mein save karna
+    name_without_ext = os.path.splitext(video_file)[0]
+    all_hashtags = re.findall(r'#\w+', name_without_ext)
+    selected_hashtags = all_hashtags[:4]
+    
+    title_text = re.sub(r'#\w+', '', name_without_ext)
+    title_clean = " ".join(title_text.replace("_", " ").replace("-", " ").split()).strip()
+    hashtags_str = " ".join(selected_hashtags)
+    
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = f"[{now_str}] Title: {title_clean} | Tags: {hashtags_str} | File: {video_file}\n"
+    
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(log_entry)
 
 def wait_for_container_ready(creation_id, access_token, max_attempts=20, delay=10):
     status_url = f"https://graph.instagram.com/v20.0/{creation_id}"
@@ -162,19 +180,23 @@ def post_instagram_reel():
 
     # Agar kam se kam ek account par bhi successfully chali gayi
     if posted_acc1 or posted_acc2:
-        print("\nVideo successfully posted! Ab GitHub se auto delete process start...")
+        print("\nVideo successfully posted! Plain text log save ho raha hai aur video delete ho rahi hai...")
         
-        # Git config aur safe deletion
+        # Plain text entry save karo posted_videos.txt mein
+        log_posted_text(video_file)
+        
+        # Git config
         subprocess.run(['git', 'config', '--global', 'user.name', 'GitHub Action Bot'])
         subprocess.run(['git', 'config', '--global', 'user.email', 'action@github.com'])
         subprocess.run(['git', 'pull', 'origin', 'main', '--rebase'])
         
-        # File delete karke push karna
+        # Log file save karo aur main video ko permanently GitHub se delete karo
+        subprocess.run(['git', 'add', LOG_FILE])
         subprocess.run(['git', 'rm', '-f', video_path])
-        subprocess.run(['git', 'commit', '-m', f"Auto-deleted {video_file} after posting"])
+        subprocess.run(['git', 'commit', '-m', f"Logged {video_file} in text and deleted video"])
         subprocess.run(['git', 'push', 'origin', 'main'])
         
-        print(f"{video_file} successfully GitHub se delete ho gayi!")
+        print(f"{video_file} permanently delete ho gayi, sirf uska text record {LOG_FILE} mein bacha hai!")
     else:
         print("\nKisi bhi account par post nahi ho saki, isliye video delete nahi ki gayi.")
 
