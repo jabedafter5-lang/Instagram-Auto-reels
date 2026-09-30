@@ -17,6 +17,9 @@ USER_ID_2 = os.getenv("IG_USER_ID_2")
 REELS_FOLDER = "reels"
 LOG_FILE = "posted_videos.txt"
 
+# Sabse upar rehne wala permanent Japanese hashtag
+TOP_HASHTAG = "#あらゆる追いかけっこを繰り広げる"
+
 BASE_CAPTION = """Follow
 
 This instagram reel shares a 15-second viral video from early December 2025, showing a capuchin monkey clinging to a water bottle rocket launched by a group during apparent Diwali festivities, soaring briefly before landing safely on a rooftop mattress.
@@ -30,7 +33,6 @@ def get_next_reel():
         os.makedirs(REELS_FOLDER)
         return None
     
-    # Latest changes pull karein
     os.system('git pull origin main --rebase || echo "Already up to date"')
     
     files = sorted(os.listdir(REELS_FOLDER))
@@ -39,54 +41,71 @@ def get_next_reel():
     if not video_files:
         return None
         
-    # Pehli available video pick karein
     return video_files[0]
 
 def build_caption_from_filename(video_file):
     name_without_ext = os.path.splitext(video_file)[0]
     
-    # Sirf valid hashtags nikalna
-    all_hashtags = re.findall(r'#\w+', name_without_ext)
-    selected_hashtags = all_hashtags[:4]
+    # 1. Filename se sabhi hashtags extract karein (Unicode support ke sath)
+    all_hashtags = re.findall(r'#[\w\u0080-\uffff]+', name_without_ext)
     
-    # Title se hashtags hatana aur clean karna
-    title_text = re.sub(r'#\w+', '', name_without_ext)
-    title_clean = " ".join(title_text.replace("_", " ").replace("-", " ").split()).strip()
+    # Agar Japanese hashtag filename me bhi ho toh use duplicate na karein
+    filtered_hashtags = [tag for tag in all_hashtags if tag != TOP_HASHTAG]
+    selected_hashtags = filtered_hashtags[:4]
+    
+    # 2. Filename me se hashtags hatayein
+    title_text = re.sub(r'#[\w\u0080-\uffff]+', '', name_without_ext)
+    
+    # 3. Faltu download prefixes clean karein: "Copy of", "(1)", "[1]", leading numbers
+    title_clean = re.sub(r'(?i)\bcopy\s*(?:of)?\b', '', title_text)
+    title_clean = re.sub(r'[\(\[\{]\s*\d+\s*[\)\]\}]', '', title_clean)
+    title_clean = re.sub(r'^\s*\d+[\.\-_:\s]+', '', title_clean)
+    title_clean = " ".join(title_clean.replace("_", " ").replace("-", " ").split()).strip()
     
     hashtags_str = " ".join(selected_hashtags)
     
-    header_parts = []
+    # Middle block (Title + 4 Hashtags)
+    middle_parts = []
     if title_clean:
-        header_parts.append(title_clean)
+        middle_parts.append(title_clean)
     if hashtags_str:
-        header_parts.append(hashtags_str)
+        middle_parts.append(hashtags_str)
         
-    custom_header = " ".join(header_parts)
+    middle_content = " ".join(middle_parts)
     
-    if custom_header:
-        final_caption = f"{custom_header}\n\n{BASE_CAPTION}"
-    else:
-        final_caption = BASE_CAPTION
-        
-    return final_caption
+    # Structure:
+    # 1. Top Japanese Hashtag
+    # 2. Title + 4 Hashtags
+    # 3. Fixed Description / Keywords
+    caption_blocks = [TOP_HASHTAG]
+    if middle_content:
+        caption_blocks.append(middle_content)
+    caption_blocks.append(BASE_CAPTION)
+    
+    return "\n\n".join(caption_blocks)
 
 def log_posted_text(video_file):
-    # Sirf plain text (Name + Tags + Date) log file mein save karna
     name_without_ext = os.path.splitext(video_file)[0]
-    all_hashtags = re.findall(r'#\w+', name_without_ext)
-    selected_hashtags = all_hashtags[:4]
+    all_hashtags = re.findall(r'#[\w\u0080-\uffff]+', name_without_ext)
+    filtered_hashtags = [tag for tag in all_hashtags if tag != TOP_HASHTAG]
+    selected_hashtags = filtered_hashtags[:4]
     
-    title_text = re.sub(r'#\w+', '', name_without_ext)
-    title_clean = " ".join(title_text.replace("_", " ").replace("-", " ").split()).strip()
+    title_text = re.sub(r'#[\w\u0080-\uffff]+', '', name_without_ext)
+    title_clean = re.sub(r'(?i)\bcopy\s*(?:of)?\b', '', title_text)
+    title_clean = re.sub(r'[\(\[\{]\s*\d+\s*[\)\]\}]', '', title_clean)
+    title_clean = re.sub(r'^\s*\d+[\.\-_:\s]+', '', title_clean)
+    title_clean = " ".join(title_clean.replace("_", " ").replace("-", " ").split()).strip()
+    
     hashtags_str = " ".join(selected_hashtags)
+    title_display = title_clean if title_clean else "No Title"
     
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_entry = f"[{now_str}] Title: {title_clean} | Tags: {hashtags_str} | File: {video_file}\n"
+    log_entry = f"[{now_str}] Title: {title_display} | Tags: {hashtags_str} | File: {video_file}\n"
     
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(log_entry)
 
-def wait_for_container_ready(creation_id, access_token, max_attempts=20, delay=10):
+def wait_for_container_ready(creation_id, access_token, max_attempts=30, delay=10):
     status_url = f"https://graph.instagram.com/v20.0/{creation_id}"
     params = {
         'fields': 'status_code',
@@ -172,33 +191,44 @@ def post_instagram_reel():
     VIDEO_URL = f"https://raw.githubusercontent.com/{REPO_NAME}/{BRANCH}/{encoded_video_path}"
 
     final_caption = build_caption_from_filename(video_file)
-    print("Generated Caption:\n", final_caption)
+    print("\n--- Final Caption to Post ---")
+    print(final_caption)
+    print("-----------------------------\n")
 
-    # Dono accounts par sequential upload
+    # Dono accounts par upload karein
     posted_acc1 = upload_to_single_account(1, USER_ID_1, ACCESS_TOKEN_1, VIDEO_URL, final_caption)
     posted_acc2 = upload_to_single_account(2, USER_ID_2, ACCESS_TOKEN_2, VIDEO_URL, final_caption)
 
-    # Agar kam se kam ek account par bhi successfully chali gayi
-    if posted_acc1 or posted_acc2:
-        print("\nVideo successfully posted! Plain text log save ho raha hai aur video delete ho rahi hai...")
+    # Dono accounts verify karein (Agar 2 accounts hain toh dono par hona zaroori hai tabhi delete karein)
+    acc1_ok = posted_acc1 if USER_ID_1 else True
+    acc2_ok = posted_acc2 if USER_ID_2 else True
+
+    if acc1_ok and acc2_ok and (posted_acc1 or posted_acc2):
+        print("\nDono accounts par successfully post ho gayi! Plain text log save ho raha hai aur video delete ho rahi hai...")
         
-        # Plain text entry save karo posted_videos.txt mein
+        # 1. Plain text entry add karein
         log_posted_text(video_file)
         
-        # Git config
+        # 2. Git setup
         subprocess.run(['git', 'config', '--global', 'user.name', 'GitHub Action Bot'])
         subprocess.run(['git', 'config', '--global', 'user.email', 'action@github.com'])
         subprocess.run(['git', 'pull', 'origin', 'main', '--rebase'])
         
-        # Log file save karo aur main video ko permanently GitHub se delete karo
-        subprocess.run(['git', 'add', LOG_FILE])
-        subprocess.run(['git', 'rm', '-f', video_path])
-        subprocess.run(['git', 'commit', '-m', f"Logged {video_file} in text and deleted video"])
+        # 3. Safe deletion from GitHub
+        subprocess.run(['git', 'rm', '-f', video_path], stderr=subprocess.DEVNULL)
+        if os.path.exists(video_path):
+            try:
+                os.remove(video_path)
+            except Exception:
+                pass
+                
+        subprocess.run(['git', 'add', '-A'])
+        subprocess.run(['git', 'commit', '-m', f"Logged and deleted {video_file}"])
         subprocess.run(['git', 'push', 'origin', 'main'])
         
-        print(f"{video_file} permanently delete ho gayi, sirf uska text record {LOG_FILE} mein bacha hai!")
+        print(f"\n[DONE] {video_file} repo se permanently delete ho gayi, aur uska text record {LOG_FILE} me save ho gaya!")
     else:
-        print("\nKisi bhi account par post nahi ho saki, isliye video delete nahi ki gayi.")
+        print("\nKisi ek ya dono accounts par upload fail hua, isliye video ko delete nahi kiya gaya taaki retry ho sake.")
 
 if __name__ == "__main__":
     post_instagram_reel()
