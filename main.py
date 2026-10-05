@@ -5,28 +5,30 @@ import requests
 import urllib.parse
 import subprocess
 
-# Account 1 Credentials
+# Account 1 Credentials (GitHub Secrets)
 ACCESS_TOKEN_1 = os.getenv("IG_ACCESS_TOKEN")
 USER_ID_1 = os.getenv("IG_USER_ID")
 
-# Account 2 Credentials
+# Account 2 Credentials (GitHub Secrets)
 ACCESS_TOKEN_2 = os.getenv("IG_ACCESS_TOKEN_2")
 USER_ID_2 = os.getenv("IG_USER_ID_2")
 
-REELS_FOLDER = "reels"
-LOG_FILE = "posted_videos.txt"
+# Folder aur Log Files
+REELS_FOLDER_1 = "reels"
+LOG_FILE_1 = "posted_videos.txt"
 
-# Sirf aur sirf yehi caption jayega har video me
+REELS_FOLDER_2 = "reels_acc2"
+LOG_FILE_2 = "posted_videos.txt_2"
+
+# Sirf Japanese caption har video ke liye
 ONLY_CAPTION = "#あらゆる追いかけっこを繰り広げる"
 
-def get_next_reel():
-    if not os.path.exists(REELS_FOLDER):
-        os.makedirs(REELS_FOLDER)
+def get_next_reel(folder_path):
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path, exist_ok=True)
         return None
     
-    os.system('git pull origin main --rebase || echo "Already up to date"')
-    
-    files = sorted(os.listdir(REELS_FOLDER))
+    files = sorted(os.listdir(folder_path))
     video_files = [f for f in files if f.lower().endswith(('.mp4', '.mov'))]
     
     if not video_files:
@@ -34,10 +36,10 @@ def get_next_reel():
         
     return video_files[0]
 
-def log_posted_text(video_file):
+def log_posted_text(log_file, video_file, account_num):
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_entry = f"[{now_str}] Caption: {ONLY_CAPTION} | File: {video_file}\n"
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
+    log_entry = f"[{now_str}] Account {account_num} | Caption: {ONLY_CAPTION} | File: {video_file}\n"
+    with open(log_file, "a", encoding="utf-8") as f:
         f.write(log_entry)
 
 def wait_for_container_ready(creation_id, access_token, max_attempts=30, delay=10):
@@ -110,60 +112,74 @@ def upload_to_single_account(account_num, user_id, token, video_url):
         return False
 
 def post_instagram_reel():
-    video_file = get_next_reel()
-    if not video_file:
-        print("Koi video nahi mili reels folder mein!")
-        return
-
-    video_path = os.path.join(REELS_FOLDER, video_file)
-    print(f"Selected video: {video_file}")
-
     REPO_NAME = os.getenv("GITHUB_REPOSITORY")
     BRANCH = "main"
-    
-    quoted_parts = [urllib.parse.quote(part) for part in video_path.split(os.sep)]
-    encoded_video_path = "/".join(quoted_parts)
-    VIDEO_URL = f"https://raw.githubusercontent.com/{REPO_NAME}/{BRANCH}/{encoded_video_path}"
 
-    print(f"Caption to post: {ONLY_CAPTION}")
+    subprocess.run(['git', 'config', '--global', 'user.name', 'GitHub Action Bot'])
+    subprocess.run(['git', 'config', '--global', 'user.email', 'action@github.com'])
+    subprocess.run(['git', 'pull', 'origin', 'main', '--rebase'])
 
-    # Account 1 par upload
-    posted_acc1 = upload_to_single_account(1, USER_ID_1, ACCESS_TOKEN_1, VIDEO_URL)
+    posted_files = []
 
-    # Dono accounts ke beech 15 minute ka delay taaki algorithm duplicate pakad kar reach zero na kare
-    if posted_acc1 and USER_ID_2 and ACCESS_TOKEN_2:
-        print("\nAccount 1 done. Waiting 15 minutes before posting to Account 2 for algorithm safety...")
-        time.sleep(900)
-
-    # Account 2 par upload
-    posted_acc2 = upload_to_single_account(2, USER_ID_2, ACCESS_TOKEN_2, VIDEO_URL)
-
-    acc1_ok = posted_acc1 if USER_ID_1 else True
-    acc2_ok = posted_acc2 if USER_ID_2 else True
-
-    if acc1_ok and acc2_ok and (posted_acc1 or posted_acc2):
-        print("\nUpload complete! Video delete ho rahi hai aur log save ho raha hai...")
+    # ================= 1. ACCOUNT 1 POSTING =================
+    video_file_1 = get_next_reel(REELS_FOLDER_1)
+    if video_file_1 and USER_ID_1 and ACCESS_TOKEN_1:
+        video_path_1 = os.path.join(REELS_FOLDER_1, video_file_1)
+        print(f"Account 1 Selected Video: {video_file_1}")
         
-        log_posted_text(video_file)
+        quoted_parts_1 = [urllib.parse.quote(part) for part in video_path_1.split(os.sep)]
+        video_url_1 = f"https://raw.githubusercontent.com/{REPO_NAME}/{BRANCH}/{'/'.join(quoted_parts_1)}"
         
-        subprocess.run(['git', 'config', '--global', 'user.name', 'GitHub Action Bot'])
-        subprocess.run(['git', 'config', '--global', 'user.email', 'action@github.com'])
-        subprocess.run(['git', 'pull', 'origin', 'main', '--rebase'])
-        
-        subprocess.run(['git', 'rm', '-f', video_path], stderr=subprocess.DEVNULL)
-        if os.path.exists(video_path):
-            try:
-                os.remove(video_path)
-            except Exception:
-                pass
-                
-        subprocess.run(['git', 'add', '-A'])
-        subprocess.run(['git', 'commit', '-m', f"Posted {video_file} with Japanese tag and auto-deleted"])
-        subprocess.run(['git', 'push', 'origin', 'main'])
-        
-        print(f"\n[DONE] {video_file} delete ho gayi aur posted_videos.txt update ho gaya!")
+        if upload_to_single_account(1, USER_ID_1, ACCESS_TOKEN_1, video_url_1):
+            log_posted_text(LOG_FILE_1, video_file_1, 1)
+            subprocess.run(['git', 'rm', '-f', video_path_1], stderr=subprocess.DEVNULL)
+            if os.path.exists(video_path_1):
+                try: os.remove(video_path_1)
+                except Exception: pass
+            posted_files.append(f"Account 1: {video_file_1}")
+            print(f"[SUCCESS] Account 1 video uploaded aur {LOG_FILE_1} me save ho gayi!")
     else:
-        print("\nUpload complete nahi hua, file safe rakhi gayi hai.")
+        print(f"Account 1 ke liye koi video ya credential nahi mila.")
+
+    # ================= 2. 1 HOUR DELAY (3600 SECONDS) =================
+    if USER_ID_2 and ACCESS_TOKEN_2:
+        print("\n=======================================================")
+        print("Account 1 process complete! Ab theek 1 ghanta (60 minutes) wait ho raha hai...")
+        print("1 ghante baad Account 2 par 'reels_acc2' folder se video post hogi.")
+        print("=======================================================")
+        time.sleep(3600)
+
+        # ================= 3. ACCOUNT 2 POSTING =================
+        video_file_2 = get_next_reel(REELS_FOLDER_2)
+        if video_file_2:
+            video_path_2 = os.path.join(REELS_FOLDER_2, video_file_2)
+            print(f"Account 2 Selected Video (from reels_acc2): {video_file_2}")
+            
+            quoted_parts_2 = [urllib.parse.quote(part) for part in video_path_2.split(os.sep)]
+            video_url_2 = f"https://raw.githubusercontent.com/{REPO_NAME}/{BRANCH}/{'/'.join(quoted_parts_2)}"
+            
+            if upload_to_single_account(2, USER_ID_2, ACCESS_TOKEN_2, video_url_2):
+                log_posted_text(LOG_FILE_2, video_file_2, 2)
+                subprocess.run(['git', 'rm', '-f', video_path_2], stderr=subprocess.DEVNULL)
+                if os.path.exists(video_path_2):
+                    try: os.remove(video_path_2)
+                    except Exception: pass
+                posted_files.append(f"Account 2: {video_file_2}")
+                print(f"[SUCCESS] Account 2 video uploaded aur {LOG_FILE_2} me save ho gayi!")
+        else:
+            print("reels_acc2 folder me koi video nahi mili!")
+
+    # ================= 4. GITHUB AUTO-COMMIT & PUSH =================
+    if posted_files:
+        print("\nRepo update ho rahi hai: posted videos delete hongi aur txt log files save hongi...")
+        subprocess.run(['git', 'pull', 'origin', 'main', '--rebase'])
+        subprocess.run(['git', 'add', '-A'])
+        commit_msg = "Posted: " + ", ".join(posted_files)
+        subprocess.run(['git', 'commit', '-m', commit_msg])
+        subprocess.run(['git', 'push', 'origin', 'main'])
+        print("\n[ALL DONE] Videos successfully deleted and log text files updated on GitHub!")
+    else:
+        print("\nKoi bhi nayi video post nahi hui, repository unchanged.")
 
 if __name__ == "__main__":
     post_instagram_reel()
